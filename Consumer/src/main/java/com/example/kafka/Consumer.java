@@ -1,22 +1,113 @@
 package com.example.kafka;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.StringDeserializer;
 
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.Arrays;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Properties;
+
+import java.util.List;
+
+class SmsEntry {
+    private String smsId;
+    private String callingPartyNumber;
+    private List<TailInstance> tailInstances;
+    private String message;
+    private String encoding;
+    private String parentId;
+    private String destinationNumber;
+
+    public String getSmsId() {
+        return smsId;
+    }
+
+    public String getCallingPartyNumber() {
+        return callingPartyNumber;
+    }
+
+    public List<TailInstance> getTailInstances() {
+        return tailInstances;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public String getEncoding() {
+        return encoding;
+    }
+
+
+    public String getParentId() {
+        return parentId;
+    }
+
+    public String getDestinationNumber() {
+        return destinationNumber;
+    }
+
+}
+
+class TailInstance {
+    private String smsId;
+    private String callingPartyNumber;
+    private List<TailInstance> tailInstances;
+    private String message;
+    private String encoding;
+    private String parentId;
+    private String destinationNumber;
+
+    // Add getters and setters here
+
+    public String getSmsId() {
+        return smsId;
+    }
+
+
+    public String getCallingPartyNumber() {
+        return callingPartyNumber;
+    }
+
+
+    public List<TailInstance> getTailInstances() {
+        return tailInstances;
+    }
+
+
+    public String getMessage() {
+        return message;
+    }
+
+
+    public String getEncoding() {
+        return encoding;
+    }
+
+
+    public String getParentId() {
+        return parentId;
+    }
+
+
+    public String getDestinationNumber() {
+        return destinationNumber;
+    }
+
+}
 
 public class Consumer
 {
     public static String NewBrokerAddress;
     public static Properties properties = new Properties();
     public static org.apache.kafka.clients.consumer.Consumer<String, String> consumer;
-    static void InitialiseConsumer(String BootstrapAddress, String Port)
+    static void InitialiseConsumer(String BootstrapAddress,String Port)
     {
         NewBrokerAddress=BootstrapAddress + ":" + Port;
 
@@ -29,93 +120,73 @@ public class Consumer
         consumer = new KafkaConsumer<>(properties);
     }
 
-    static void ReadMessage(String TopicName, int Partition) throws JsonProcessingException, InterruptedException {
-        // Assign the consumer to a specific partition
-        TopicPartition topicPartition = new TopicPartition(TopicName, Partition);
+    static void ReadMessage(String topicName, int noOfPartition) throws InterruptedException {
+
+        TopicPartition topicPartition = new TopicPartition(topicName, noOfPartition);
         consumer.assign(Collections.singletonList(topicPartition));
 
         // Seek to the beginning of the partition
-        //consumer.seekToBeginning(Collections.singletonList(topicPartition));
+        consumer.seekToBeginning(Collections.singletonList(topicPartition));
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        Callable<String> consumeTask = () ->{
+            Thread.sleep(1); // Simulate some work
 
+            {
+                //noinspection InfiniteLoopStatement
+                while (true) {
+                    // Poll for new messages
+                    ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));
+                    
+                    for (ConsumerRecord<String, String> record : records) {
+                         long offset = record.offset();
+                         String value = record.value();
+                        System.out.println("Offset: " + offset + "\nValue: " + value);
 
+                        Gson gson = new Gson();
 
-        // Poll for new messages
-        while (true)
-        {
-            ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));
-            String smsId, callingPartyNumber, message, destinationNumber;
-            for (ConsumerRecord<String, String> record : records) {
-                //String key = record.key();
-                String value = record.value();
-                System.out.println("Offset = " + record.offset());
-                System.out.println("");
+                        // Convert JSON to Java object
+                        SmsData smsData = gson.fromJson(value, SmsData.class);
 
-                ObjectMapper objectMapper = new ObjectMapper();
-                JsonNode jsonNode = objectMapper.readTree(value);
-                int i=0;
-                // Read values from the JSON using key names
-                JsonNode dataNode = jsonNode.get("data");
-                if (dataNode.isArray() && dataNode.size() > 0)
-                {
-                    i=0;
-                    while(i<dataNode.size())
-                    {
-                        JsonNode firstDataItem = dataNode.get(i);
-                        if(firstDataItem.get("tailInstances").asText()!=null)
-                        {
-                            JsonNode tailinstancesNode = firstDataItem.get("tailInstances");
+                        // Now you can access the data in the smsData object
+                        List<SmsEntry> smsEntries = smsData.getData();
 
-                            int j=0;
-                            while(j<tailinstancesNode.size())
+                        for (SmsEntry smsEntry : smsEntries) {
+                            // Access individual SMS entries and their properties here
+                            List<TailInstance> smsEntries2 = smsEntry.getTailInstances();
+                            for (TailInstance smsEntry2 : smsEntries2)
                             {
-                                JsonNode secondDataItem = tailinstancesNode.get(j);
-                                smsId = secondDataItem.get("smsId").asText();
-                                callingPartyNumber = secondDataItem.get("callingPartyNumber").asText();
-                                message = secondDataItem.get("message").asText();
-                                destinationNumber = secondDataItem.get("destinationNumber").asText();
-
-                                // Print the values
-                                System.out.println("SMS ID: " + smsId);
-                                System.out.println("Calling Party Number: " + callingPartyNumber);
-                                System.out.println("Message: " + message);
-                                System.out.println("Destination Number: " + destinationNumber);
-                                System.out.println("Destination Number: " + destinationNumber);
-                                System.out.println("");
-                                j++;
+                                System.out.println("SMS ID: " + smsEntry2.getSmsId());
+                                System.out.println("Message: " + smsEntry2.getMessage());
                             }
+                            System.out.println("SMS ID: " + smsEntry.getSmsId());
+                            System.out.println("Message: " + smsEntry.getMessage());
                         }
-                        smsId = firstDataItem.get("smsId").asText();
-                        callingPartyNumber = firstDataItem.get("callingPartyNumber").asText();
-                        message = firstDataItem.get("message").asText();
-                        destinationNumber = firstDataItem.get("destinationNumber").asText();
 
-                        // Print the values
-                        System.out.println("SMS ID: " + smsId);
-                        System.out.println("Calling Party Number: " + callingPartyNumber);
-                        System.out.println("Message: " + message);
-                        System.out.println("Destination Number: " + destinationNumber);
-                        System.out.println("Destination Number: " + destinationNumber);
-                        System.out.println("");
-                        i++;
+                        // Manually commit the offset after processing the message
+                        consumer.commitSync(Collections.singletonMap(
+                                new TopicPartition(record.topic(), record.partition()),
+                                new OffsetAndMetadata(record.offset() + 1)
+                        ));
                     }
                 }
-                else
-                {
-                    System.out.println("No data found or data is not an array.");
-                }
-                // Manually commit the offset after processing the message
-                consumer.commitSync(Collections.singletonMap(
-                        new TopicPartition(record.topic(), record.partition()),
-                        new OffsetAndMetadata(record.offset() + 1)
-                ));
-                //Thread.sleep(1000);
             }
-        }
+        };
+        Callable<String> outsideTask = () ->{
 
+            Thread.sleep(1500);
+            System.out.println("\nYes\n");
+            return null;
+        };
+
+        // Submit tasks to the ExecutorService
+        executor.invokeAll(Arrays.asList(consumeTask, outsideTask));
+
+        // Shutdown the ExecutorService when all tasks are done
+        executor.shutdown();
     }
 
-    public static void main(String[] args) throws JsonProcessingException, InterruptedException {
+    public static void main(String[] args) throws InterruptedException {
         InitialiseConsumer("localhost", "9092");
-        ReadMessage("telco_gp2", 0);
+        ReadMessage("telco_gp3", 0);
     }
 }
