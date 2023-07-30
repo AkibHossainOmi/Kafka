@@ -35,6 +35,14 @@ Install `IntelliJ IDEA` and `openjdk version "1.8.0_362"`
 <br>
 Now, you can clone the repository and run the Java producer and consumer to create topic, produce message and consume those message.
 
+Important Links:
+
+->  <a href="https://kafka.apache.org/intro">Introduction</a>
+
+->  <a href="https://kafka.apache.org/downloads">Downloads</a>
+
+->  <a href="https://kafka.apache.org/quickstart">Quickstart</a>
+
 
 
 
